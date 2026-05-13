@@ -137,8 +137,8 @@ async def main():
             menu_index = (menu_index + 1) % (max_missions + 1)
             await runloop.sleep_ms(250)
         
-        # Iniciar Missão Selecionada
-        if button.pressed(button.CENTER):
+        # Iniciar Missão Selecionada (Usando o botão Bluetooth/Connect)
+        if button.pressed(button.CONNECT):
             light_matrix.show_image(light_matrix.IMAGE_ARROW_N)
             print("\n>>> Iniciando Teste {}".format(menu_index))
             
