@@ -95,9 +95,11 @@ async def main():
     await runloop.sleep_ms(2000)
     
     # 2. VOLTA (Invertendo o caminho)
-    print("\n--- FASE 2: VOLTA ---")
+    print("\n--- FASE 2: VOLTA (VELOCIDADE MÁXIMA) ---")
+    vel_max = 1000
+    
     # Volta 2 segundos de ré (mantendo o ângulo de 60°)
-    await move_straight_with_gyro(motor_pair.PAIR_1, 2000, 60, -vel_reta)
+    await move_straight_with_gyro(motor_pair.PAIR_1, 2000, 60, -vel_max)
     await runloop.sleep_ms(500)
     
     # Gira de volta para 0°
@@ -105,7 +107,7 @@ async def main():
     await runloop.sleep_ms(500)
     
     # Volta 3 segundos de ré (mantendo o ângulo de 0°)
-    await move_straight_with_gyro(motor_pair.PAIR_1, 3000, 0, -vel_reta)
+    await move_straight_with_gyro(motor_pair.PAIR_1, 3000, 0, -vel_max)
 
     print("\nRetorno concluído!")
     print("Erro de orientação final: {:.2f}°".format(motion_sensor.tilt_angles()[0] * -0.1))
