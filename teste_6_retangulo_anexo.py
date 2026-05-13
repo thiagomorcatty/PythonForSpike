@@ -8,18 +8,19 @@ import motor
 # Circunferência = 17.6cm -> 360 / 17.6 = ~20.45
 CM_TO_DEG = 20.45
 
-async def move_straight_with_gyro(pair, left_port, right_port, distance_cm, velocity):
+async def move_straight_with_gyro(pair, left_port, right_port, distance_cm, velocity, anexo_port=None):
     """
-    Move o robô em linha reta por uma distância em CM usando correção de giro.
+    Move o robô em linha reta com correção de giro e controle de anexo integrado.
     """
     target_degrees = distance_cm * CM_TO_DEG
     motor.reset_relative_position(left_port, 0)
     motor.reset_relative_position(right_port, 0)
     
+    start_time = utime.ticks_ms()
     target_yaw = motion_sensor.tilt_angles()[0] * -0.1
     kp = 1.2 
     
-    print("Retângulo: {}cm ({:.0f}°) | Rumo: {:.1f}°".format(distance_cm, target_degrees, target_yaw))
+    print("Iniciando reta: {}cm | Rumo: {:.1f}°".format(distance_cm, target_yaw))
     
     while True:
         current_yaw = motion_sensor.tilt_angles()[0] * -0.1
@@ -38,6 +39,7 @@ async def move_straight_with_gyro(pair, left_port, right_port, distance_cm, velo
         else:
             current_vel = velocity
 
+        # Correção do Giro
         error = target_yaw - current_yaw
         while error > 180: error -= 360
         while error < -180: error += 360
@@ -47,9 +49,22 @@ async def move_straight_with_gyro(pair, left_port, right_port, distance_cm, velo
         if correction < -25: correction = -25
         
         motor_pair.move(pair, int(correction), velocity=current_vel)
+        
+        # Controle INTEGRADO do anexo (Porta F) para evitar travar o Hub
+        if anexo_port is not None:
+            tempo_decorrido = utime.ticks_diff(utime.ticks_ms(), start_time)
+            if tempo_decorrido < 1000:
+                motor.pwm(anexo_port, 60) # 1º segundo
+            elif tempo_decorrido < 2000:
+                motor.pwm(anexo_port, -60) # 2º segundo
+            else:
+                motor.stop(anexo_port)
+        
         await runloop.sleep_ms(10)
     
     motor_pair.stop(pair)
+    if anexo_port is not None:
+        motor.stop(anexo_port)
 
 async def turn_to_angle(pair, target_yaw_deg, velocity):
     """
@@ -72,22 +87,8 @@ async def turn_to_angle(pair, target_yaw_deg, velocity):
         
     motor_pair.stop(pair)
 
-async def run_attachment(port_f):
-    """
-    Movimenta o anexo na porta F: 180 graus para um lado, 180 para o outro.
-    """
-    print("Ativando anexo na Porta F (180°)...")
-    try:
-        # Move 180 graus sentido horário
-        await motor.run_for_degrees(port_f, 180, 500)
-        # Move 180 graus sentido anti-horário
-        await motor.run_for_degrees(port_f, -180, 500)
-        print("Anexo concluído.")
-    except Exception as e:
-        print("Erro no anexo F: {}".format(e))
-
 async def main():
-    print("--- Teste 6: Retângulo com Anexo ---")
+    print("--- Teste 6 Corrigido: Retângulo com Anexo ---")
     
     p_left = port.A
     p_right = port.B
@@ -102,10 +103,10 @@ async def main():
     
     motor_pair.pair(motor_pair.PAIR_1, p_left, p_right)
     
-    vel_reta = 400
+    vel_reta = 350
     vel_giro = 150
     
-    # Trajeto do Retângulo: 25cm -> 50cm -> 25cm -> 50cm
+    # Trajeto: 25cm -> 50cm (com anexo) -> 25cm -> 50cm (com anexo)
     lados = [25, 50, 25, 50]
     
     for i, distancia in enumerate(lados):
@@ -115,23 +116,21 @@ async def main():
         
         print("\n--- Lado {} ({}cm) ---".format(lado_num, distancia))
         
-        # Se for o lado de 50cm, iniciamos o anexo em paralelo
-        if distancia == 50:
-            # No SPIKE 3, para rodar em paralelo sem bloquear a reta:
-            runloop.spawn(run_attachment(p_anexo))
+        # Define se o anexo deve rodar neste lado
+        p_anexo_param = p_anexo if distancia == 50 else None
         
-        # Move em linha reta com correção de giro
-        await move_straight_with_gyro(motor_pair.PAIR_1, p_left, p_right, distancia, vel_reta)
+        # Executa o movimento (o anexo agora é controlado dentro da função move_straight)
+        await move_straight_with_gyro(motor_pair.PAIR_1, p_left, p_right, distancia, vel_reta, anexo_port=p_anexo_param)
         
         await runloop.sleep_ms(500)
         
-        # Curva para o próximo lado (exceto após o último lado, se quiser parar na orientação inicial)
+        # Curva
         proximo_alvo = ((i + 1) * 90) % 360
         if proximo_alvo > 180: proximo_alvo -= 360
         
         await turn_to_angle(motor_pair.PAIR_1, proximo_alvo, vel_giro)
         await runloop.sleep_ms(500)
 
-    print("\nRetângulo com anexo concluído!")
+    print("\nRetângulo concluído!")
 
 runloop.run(main())
