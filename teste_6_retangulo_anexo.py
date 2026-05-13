@@ -74,12 +74,14 @@ async def turn_to_angle(pair, target_yaw_deg, velocity):
 
 async def run_attachment(port_f):
     """
-    Movimenta o anexo na porta F: 1s para um lado, 1s para o outro.
+    Movimenta o anexo na porta F: 180 graus para um lado, 180 para o outro.
     """
-    print("Ativando anexo na Porta F...")
+    print("Ativando anexo na Porta F (180°)...")
     try:
-        await motor.run_for_time(port_f, 1000, 500) # 1 segundo a 500 vel
-        await motor.run_for_time(port_f, 1000, -500) # 1 segundo a -500 vel
+        # Move 180 graus sentido horário
+        await motor.run_for_degrees(port_f, 180, 500)
+        # Move 180 graus sentido anti-horário
+        await motor.run_for_degrees(port_f, -180, 500)
         print("Anexo concluído.")
     except Exception as e:
         print("Erro no anexo F: {}".format(e))
