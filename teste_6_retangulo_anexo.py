@@ -54,9 +54,9 @@ async def move_straight_with_gyro(pair, left_port, right_port, distance_cm, velo
         if anexo_port is not None:
             tempo_decorrido = utime.ticks_diff(utime.ticks_ms(), start_time)
             if tempo_decorrido < 1000:
-                motor.pwm(anexo_port, 60) # 1º segundo
+                motor.run(anexo_port, 300) # Gira a 300 deg/s
             elif tempo_decorrido < 2000:
-                motor.pwm(anexo_port, -60) # 2º segundo
+                motor.run(anexo_port, -300) # Gira a -300 deg/s
             else:
                 motor.stop(anexo_port)
         
