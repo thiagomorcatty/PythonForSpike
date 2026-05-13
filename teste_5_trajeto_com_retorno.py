@@ -7,43 +7,50 @@ import motor
 async def move_straight_with_gyro(pair, left_port, right_port, target_degrees, velocity):
     """
     Move o robô em linha reta usando o giroscópio para corrigir o rumo,
-    parando quando atingir a distância em graus (encoders).
+    com rampa de desaceleração para precisão total.
     """
-    # Reseta os encoders para este movimento
     motor.reset_relative_position(left_port, 0)
     motor.reset_relative_position(right_port, 0)
     
-    # O alvo do giroscópio é o ângulo atual no momento do início
     target_yaw = motion_sensor.tilt_angles()[0] * -0.1
     kp = 1.2 
     
-    print("Iniciando Movimento: {} graus | Alvo Giro: {:.1f}°".format(target_degrees, target_yaw))
+    print("Movimento Preciso: {} graus | Rumo: {:.1f}°".format(target_degrees, target_yaw))
     
     while True:
         current_yaw = motion_sensor.tilt_angles()[0] * -0.1
-        
-        # Média da distância percorrida pelos dois motores
         pos_left = motor.relative_position(left_port)
         pos_right = motor.relative_position(right_port)
         current_distance = (abs(pos_left) + abs(pos_right)) / 2
         
-        if current_distance >= abs(target_degrees):
+        remaining = abs(target_degrees) - current_distance
+        
+        if remaining <= 0:
             break
             
+        # Rampa de Desaceleração: Reduz a velocidade nos últimos 400 graus
+        if remaining < 400:
+            # Calcula velocidade proporcional ao que falta, mínimo de 100
+            v_scaled = int(velocity * (remaining / 400))
+            if abs(v_scaled) < 100:
+                v_scaled = 100 if velocity > 0 else -100
+            current_vel = v_scaled
+        else:
+            current_vel = velocity
+
         # Correção do Giro
         error = target_yaw - current_yaw
         while error > 180: error -= 360
         while error < -180: error += 360
         
         correction = error * kp
-        # Inverte a correção se estiver indo de ré
         if velocity < 0:
             correction = -correction
 
         if correction > 25: correction = 25
         if correction < -25: correction = -25
         
-        motor_pair.move(pair, int(correction), velocity=velocity)
+        motor_pair.move(pair, int(correction), velocity=current_vel)
         await runloop.sleep_ms(10)
     
     motor_pair.stop(pair)
