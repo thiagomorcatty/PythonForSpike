@@ -4,30 +4,39 @@ from hub import port, motion_sensor
 import utime
 import motor
 
-async def move_straight_with_gyro(pair, duration_ms, target_yaw, velocity):
+async def move_straight_with_gyro(pair, left_port, right_port, target_degrees, velocity):
     """
-    Move o robô em linha reta usando o giroscópio para corrigir o rumo.
-    Funciona para frente (vel > 0) e para trás (vel < 0).
+    Move o robô em linha reta usando o giroscópio para corrigir o rumo,
+    parando quando atingir a distância em graus (encoders).
     """
-    start_time = utime.ticks_ms()
+    # Reseta os encoders para este movimento
+    motor.reset_relative_position(left_port, 0)
+    motor.reset_relative_position(right_port, 0)
+    
+    # O alvo do giroscópio é o ângulo atual no momento do início
+    target_yaw = motion_sensor.tilt_angles()[0] * -0.1
     kp = 1.2 
     
-    print("Iniciando Movimento... Alvo: {:.1f}° | Vel: {}".format(target_yaw, velocity))
+    print("Iniciando Movimento: {} graus | Alvo Giro: {:.1f}°".format(target_degrees, target_yaw))
     
-    while utime.ticks_diff(utime.ticks_ms(), start_time) < duration_ms:
+    while True:
         current_yaw = motion_sensor.tilt_angles()[0] * -0.1
+        
+        # Média da distância percorrida pelos dois motores
+        pos_left = motor.relative_position(left_port)
+        pos_right = motor.relative_position(right_port)
+        current_distance = (abs(pos_left) + abs(pos_right)) / 2
+        
+        if current_distance >= abs(target_degrees):
+            break
+            
+        # Correção do Giro
         error = target_yaw - current_yaw
         while error > 180: error -= 360
         while error < -180: error += 360
         
         correction = error * kp
-        
-        # Inverte a correção se estiver indo de ré para manter a lógica de direção
-        # Se estou indo para trás e quero corrigir para a esquerda, o steering deve ser ajustado
-        # Na verdade, o motor_pair.move com steering e velocidade negativa inverte o sentido do giro.
-        # Vamos testar: se steering=10 (direita) e vel=100 -> gira para direita.
-        # Se steering=10 (direita) e vel=-100 -> gira para a direita indo de ré (cauda vai para a esquerda).
-        # Para o giroscópio, o que importa é a rotação do hub.
+        # Inverte a correção se estiver indo de ré
         if velocity < 0:
             correction = -correction
 
@@ -61,7 +70,7 @@ async def turn_to_angle(pair, target_yaw_deg, velocity):
     motor_pair.stop(pair)
 
 async def main():
-    print("--- Teste 5: Trajeto com Retorno Preciso ---")
+    print("--- Teste 5 Corrigido: Retorno por Encoders ---")
     
     p_left = port.A
     p_right = port.B
@@ -75,39 +84,38 @@ async def main():
     
     motor_pair.pair(motor_pair.PAIR_1, p_left, p_right)
     
-    vel_reta = 350
+    # Definimos as distâncias em GRAUS de rotação do motor
+    distancia_1 = 1500 # Aprox. 3 segundos a 350 vel
+    distancia_2 = 1000 # Aprox. 2 segundos a 350 vel
+    
+    vel_ida = 350
+    vel_volta = 1000 # Velocidade máxima pedida
     vel_giro = 150
     
     # 1. IDA
-    print("\n--- FASE 1: IDA ---")
-    # Anda 3 segundos reto (0°)
-    await move_straight_with_gyro(motor_pair.PAIR_1, 3000, 0, vel_reta)
+    print("\n--- FASE 1: IDA (Vel: {}) ---".format(vel_ida))
+    await move_straight_with_gyro(motor_pair.PAIR_1, p_left, p_right, distancia_1, vel_ida)
     await runloop.sleep_ms(500)
     
-    # Curva de 60 graus para a direita
     await turn_to_angle(motor_pair.PAIR_1, 60, vel_giro)
     await runloop.sleep_ms(500)
     
-    # Anda 2 segundos reto (60°)
-    await move_straight_with_gyro(motor_pair.PAIR_1, 2000, 60, vel_reta)
+    await move_straight_with_gyro(motor_pair.PAIR_1, p_left, p_right, distancia_2, vel_ida)
     
     print("Pausa no destino...")
     await runloop.sleep_ms(2000)
     
-    # 2. VOLTA (Invertendo o caminho)
-    print("\n--- FASE 2: VOLTA (VELOCIDADE MÁXIMA) ---")
-    vel_max = 1000
-    
-    # Volta 2 segundos de ré (mantendo o ângulo de 60°)
-    await move_straight_with_gyro(motor_pair.PAIR_1, 2000, 60, -vel_max)
+    # 2. VOLTA
+    print("\n--- FASE 2: VOLTA (Vel: {}) ---".format(vel_volta))
+    # Volta a mesma distância exata (distancia_2) mas com velocidade negativa
+    await move_straight_with_gyro(motor_pair.PAIR_1, p_left, p_right, distancia_2, -vel_volta)
     await runloop.sleep_ms(500)
     
-    # Gira de volta para 0°
     await turn_to_angle(motor_pair.PAIR_1, 0, vel_giro)
     await runloop.sleep_ms(500)
     
-    # Volta 3 segundos de ré (mantendo o ângulo de 0°)
-    await move_straight_with_gyro(motor_pair.PAIR_1, 3000, 0, -vel_max)
+    # Volta a mesma distância exata (distancia_1)
+    await move_straight_with_gyro(motor_pair.PAIR_1, p_left, p_right, distancia_1, -vel_volta)
 
     print("\nRetorno concluído!")
     print("Erro de orientação final: {:.2f}°".format(motion_sensor.tilt_angles()[0] * -0.1))
