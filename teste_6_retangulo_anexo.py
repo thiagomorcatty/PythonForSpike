@@ -106,8 +106,8 @@ async def main():
     vel_reta = 350
     vel_giro = 150
     
-    # Trajeto: 25cm -> 50cm (com anexo) -> 25cm -> 50cm (com anexo)
-    lados = [25, 50, 25, 50]
+    # Trajeto: 30cm -> 60cm (com anexo) -> 30cm -> 60cm (com anexo)
+    lados = [30, 60, 30, 60]
     
     for i, distancia in enumerate(lados):
         lado_num = i + 1
@@ -116,8 +116,8 @@ async def main():
         
         print("\n--- Lado {} ({}cm) ---".format(lado_num, distancia))
         
-        # Define se o anexo deve rodar neste lado
-        p_anexo_param = p_anexo if distancia == 50 else None
+        # Define se o anexo deve rodar neste lado (nos lados de 60cm)
+        p_anexo_param = p_anexo if distancia == 60 else None
         
         # Executa o movimento (o anexo agora é controlado dentro da função move_straight)
         await move_straight_with_gyro(motor_pair.PAIR_1, p_left, p_right, distancia, vel_reta, anexo_port=p_anexo_param)
