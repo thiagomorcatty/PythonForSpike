@@ -130,15 +130,15 @@ async def main():
         light_matrix.write(str(menu_index))
         
         # Navegação do Menu
-        if button.left.is_pressed():
+        if button.pressed(button.LEFT):
             menu_index = (menu_index - 1) % (max_missions + 1)
-            await runloop.sleep_ms(200)
-        elif button.right.is_pressed():
+            await runloop.sleep_ms(250)
+        elif button.pressed(button.RIGHT):
             menu_index = (menu_index + 1) % (max_missions + 1)
-            await runloop.sleep_ms(200)
+            await runloop.sleep_ms(250)
         
         # Iniciar Missão Selecionada
-        if button.center.is_pressed():
+        if button.pressed(button.CENTER):
             light_matrix.show_image(light_matrix.IMAGE_ARROW_N)
             print("\n>>> Iniciando Teste {}".format(menu_index))
             
