@@ -6,7 +6,8 @@ import motor
 
 # Constante de conversão: graus de motor por cm (roda padrão Spike = 5.6cm diâmetro)
 # Circunferência = 17.6cm -> 360 / 17.6 = ~20.45
-CM_TO_DEG = 20.45
+# Constante de conversão ajustada para compensar o erro de 2cm (Calibração: 20.65)
+CM_TO_DEG = 20.65
 
 async def move_straight_with_gyro(pair, left_port, right_port, distance_cm, velocity, anexo_port=None):
     """
@@ -32,10 +33,10 @@ async def move_straight_with_gyro(pair, left_port, right_port, distance_cm, velo
         if remaining <= 0:
             break
             
-        # Rampa de desaceleração
-        if remaining < 300:
-            v_scaled = int(velocity * (remaining / 300))
-            current_vel = v_scaled if abs(v_scaled) > 100 else (100 if velocity > 0 else -100)
+        # Rampa de desaceleração aumentada para 500 graus para maior precisão
+        if remaining < 500:
+            v_scaled = int(velocity * (remaining / 500))
+            current_vel = v_scaled if abs(v_scaled) > 80 else (80 if velocity > 0 else -80)
         else:
             current_vel = velocity
 
@@ -50,13 +51,13 @@ async def move_straight_with_gyro(pair, left_port, right_port, distance_cm, velo
         
         motor_pair.move(pair, int(correction), velocity=current_vel)
         
-        # Controle INTEGRADO do anexo (Porta F) para evitar travar o Hub
+        # Controle INTEGRADO do anexo (Porta F)
         if anexo_port is not None:
             tempo_decorrido = utime.ticks_diff(utime.ticks_ms(), start_time)
             if tempo_decorrido < 1000:
-                motor.run(anexo_port, 300) # Gira a 300 deg/s
+                motor.run(anexo_port, 300)
             elif tempo_decorrido < 2000:
-                motor.run(anexo_port, -300) # Gira a -300 deg/s
+                motor.run(anexo_port, -300)
             else:
                 motor.stop(anexo_port)
         
@@ -76,11 +77,11 @@ async def turn_to_angle(pair, target_yaw_deg, velocity):
         while error > 180: error -= 360
         while error < -180: error += 360
         
-        if abs(error) < 1.0:
+        if abs(error) < 0.5: # Precisão de curva aumentada para 0.5 graus
             break
             
         steering = 100 if error > 0 else -100
-        current_vel = velocity if abs(error) > 15 else 60
+        current_vel = velocity if abs(error) > 15 else 50
         
         motor_pair.move(pair, steering, velocity=current_vel)
         await runloop.sleep_ms(10)
@@ -88,7 +89,7 @@ async def turn_to_angle(pair, target_yaw_deg, velocity):
     motor_pair.stop(pair)
 
 async def main():
-    print("--- Teste 6 Corrigido: Retângulo com Anexo ---")
+    print("--- Teste 6 Calibrado: Retângulo 35x70 ---")
     
     p_left = port.A
     p_right = port.B
@@ -104,10 +105,10 @@ async def main():
     motor_pair.pair(motor_pair.PAIR_1, p_left, p_right)
     
     vel_reta = 350
-    vel_giro = 150
+    vel_giro = 100 # Reduzimos a velocidade de giro para 100 para evitar inércia
     
-    # Trajeto: 30cm -> 60cm (com anexo) -> 30cm -> 60cm (com anexo)
-    lados = [30, 60, 30, 60]
+    # Trajeto: 35cm -> 70cm (com anexo) -> 35cm -> 70cm (com anexo)
+    lados = [35, 70, 35, 70]
     
     for i, distancia in enumerate(lados):
         lado_num = i + 1
@@ -116,10 +117,10 @@ async def main():
         
         print("\n--- Lado {} ({}cm) ---".format(lado_num, distancia))
         
-        # Define se o anexo deve rodar neste lado (nos lados de 60cm)
-        p_anexo_param = p_anexo if distancia == 60 else None
+        # Define se o anexo deve rodar neste lado (nos lados de 70cm)
+        p_anexo_param = p_anexo if distancia == 70 else None
         
-        # Executa o movimento (o anexo agora é controlado dentro da função move_straight)
+        # Executa o movimento
         await move_straight_with_gyro(motor_pair.PAIR_1, p_left, p_right, distancia, vel_reta, anexo_port=p_anexo_param)
         
         await runloop.sleep_ms(500)
@@ -131,6 +132,6 @@ async def main():
         await turn_to_angle(motor_pair.PAIR_1, proximo_alvo, vel_giro)
         await runloop.sleep_ms(500)
 
-    print("\nRetângulo concluído!")
+    print("\nRetângulo Calibrado Concluído!")
 
 runloop.run(main())
